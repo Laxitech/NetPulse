@@ -159,20 +159,6 @@ console.log('details panel:', detailText);
 
 console.log('JAVASCRIPT ERRORS:', errors.length ? errors : 'none');
 
-// 9b. My-IP badge + quick TRACE IP action
-await page.waitForFunction(() => /MY IP/.test(document.body.textContent), { timeout: 8000 }).catch(() => {});
-const myIpState = await page.evaluate(() => ({
-  badge: document.getElementById('myIpValue').textContent,
-  quickDisabled: document.getElementById('traceIpBtn').disabled,
-  footer: document.querySelector('.app-footer').textContent.trim(),
-}));
-console.log('my ip / quick action:', myIpState);
-const myIpOk =
-  /^\d{1,3}(\.\d{1,3}){3}$/.test(myIpState.badge) &&
-  myIpState.quickDisabled === false &&
-  /GALAXYDEV.PK/i.test(myIpState.footer) &&
-  /info@galaxydev\.pk/i.test(myIpState.footer);
-
 // 9c. Rate limiting: a burst of API calls must start returning 429
 const burst = await page.evaluate(async () => {
   const out = [];
@@ -209,7 +195,7 @@ const ok =
   /COMPLETE|UNREACHABLE/.test(traceStatus) && mapPanes.hasLeaflet && mapLive.traveler &&
   mapLive.loadedTiles > 0 && mapLive.travelerOpacity !== '0' &&
   mapPanes.destMarker === destReached && // star only when destination reached
-  myIpOk && rateOk && themeOk && errors.length === 0;
+  rateOk && themeOk && errors.length === 0;
 
 await browser.close();
 console.log(ok ? 'SMOKE TEST: PASS' : 'SMOKE TEST: FAIL');

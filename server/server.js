@@ -13,33 +13,6 @@ const PORT = process.env.PORT || 9901;
 
 const ipInfoCache = new Map();
 
-let myIpCache = null;
-let myIpFetching = null;
-
-function fetchMyIp() {
-  if (myIpCache) return Promise.resolve(myIpCache);
-  if (myIpFetching) return myIpFetching;
-  myIpFetching = new Promise((resolve) => {
-    const req = httpsGet('https://ipinfo.io/ip', { timeout: 4000 }, (res) => {
-      let body = '';
-      res.on('data', (c) => { body += c; });
-      res.on('end', () => {
-        const ip = body.trim();
-        if (ip && /^[0-9a-fA-F:.]+$/.test(ip)) {
-          myIpCache = ip;
-          setTimeout(() => { myIpCache = null; }, 6 * 60 * 60 * 1000);
-          resolve(ip);
-        } else {
-          resolve(null);
-        }
-      });
-    });
-    req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
-  });
-  return myIpFetching;
-}
-
 function fetchIpInfo(ip) {
   return new Promise((resolve) => {
     if (ipInfoCache.has(ip)) return resolve(ipInfoCache.get(ip));
@@ -207,12 +180,6 @@ const server = createServer(async (req, res) => {
       status: 'ok',
       command: cmd || 'none',
     });
-  }
-
-  // Public IP of this server / client
-  if (pathname === '/api/myip' && req.method === 'GET') {
-    const ip = await fetchMyIp();
-    return sendJson(res, 200, { ip });
   }
 
   // Start trace

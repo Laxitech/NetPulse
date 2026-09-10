@@ -61,7 +61,6 @@ Browser ←─ WebSocket ─→ Node.js server ←─ spawn() ─→ traceroute 
 | Endpoint | Description |
 | --- | --- |
 | `GET /api/health` | Server + traceroute-command status |
-| `GET /api/myip` | Your public IP (cached, ipinfo.io) |
 | `GET /api/trace/status` | Whether a trace is in progress |
 | `GET /api/ipinfo/:ip` | Cached ipinfo.io lookup for an IP |
 | `GET /vendor/*` | Leaflet assets served locally (allowlist enforced) |

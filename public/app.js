@@ -15,9 +15,6 @@ import { startSplash } from './js/splash.js';
   const themeToggle = document.getElementById('themeToggle');
   const graphEmpty = document.getElementById('graphEmpty');
   const hopTableBody = document.getElementById('hopTableBody');
-  const myIpEl = document.getElementById('myIp');
-  const myIpValueEl = document.getElementById('myIpValue');
-  const traceIpBtn = document.getElementById('traceIpBtn');
 
   const canvas = document.getElementById('networkGraph');
   const infoCard = document.getElementById('infoCard');
@@ -31,7 +28,6 @@ import { startSplash } from './js/splash.js';
   let ws = null;
   let tracing = false;
   let rawHops = [];
-  let myIp = null;
 
   // ─── Theme ──────────────────────────────────────────────
 
@@ -256,27 +252,7 @@ import { startSplash } from './js/splash.js';
     traceBtn.disabled = tracing;
     stopBtn.disabled = !tracing;
     destInput.disabled = tracing;
-    traceIpBtn.disabled = tracing || !myIp;
   }
-
-  function setMyIp(ip) {
-    myIp = ip || null;
-    if (myIp) {
-      myIpValueEl.textContent = myIp;
-      if (myIpEl) myIpEl.title = `Your public IP \u2014 ${myIp}`;
-    } else {
-      myIpValueEl.textContent = '\u2014';
-      myIpEl.title = 'Could not determine public IP';
-    }
-    updateControls();
-  }
-
-  traceIpBtn.addEventListener('click', () => {
-    if (!myIp || tracing) return;
-    destInput.value = myIp;
-    destInput.focus();
-    startTrace();
-  });
 
   function setTraceStatus(text, cls) {
     traceStatusEl.textContent = text;
@@ -364,11 +340,6 @@ import { startSplash } from './js/splash.js';
     destInput.focus({ preventScroll: true });
     if (map.map) setTimeout(() => { try { map.map.invalidateSize(); } catch {} }, 120);
   } });
-
-  fetch('/api/myip')
-    .then((r) => r.ok ? r.json() : null)
-    .then((data) => setMyIp(data && data.ip ? data.ip : null))
-    .catch(() => setMyIp(null));
 
   if (map.map) setTimeout(() => { try { map.map.invalidateSize(); } catch {} }, 300);
 
