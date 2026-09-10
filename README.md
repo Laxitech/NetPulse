@@ -116,13 +116,13 @@ npm install
 npm start
 ```
 
-Then open **http://localhost:3000**, type a destination such as `8.8.8.8`, and press **Trace** (or Enter).
+Then open **http://localhost:9901**, type a destination such as `8.8.8.8`, and press **Trace** (or Enter).
 
 ### Command line
 
 | Command | Purpose |
 | --- | --- |
-| `npm start` | Run the server on port 3000 |
+| `npm start` | Run the server on port 9901 |
 | `npm run dev` | Run with auto-restart on file changes |
 | `PORT=8080 npm start` | Run on a custom port |
 

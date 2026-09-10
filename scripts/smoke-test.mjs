@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-core';
 
-const URL = process.env.NETPULSE_URL || 'http://localhost:3000';
+const URL = process.env.NETPULSE_URL || 'http://localhost:9901';
 const CHROME = '/usr/bin/google-chrome';
 const DEST = process.env.NETPULSE_DEST || '8.8.8.8';
 

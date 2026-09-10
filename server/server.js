@@ -9,7 +9,7 @@ import { parseTracerouteLine } from './parser.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const PUBLIC = join(__dirname, '..', 'public');
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 9901;
 
 const ipInfoCache = new Map();
 
