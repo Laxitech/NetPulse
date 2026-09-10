@@ -169,6 +169,16 @@ function readBody(req) {
   });
 }
 
+function cacheHeaders(pathname, url) {
+  if (pathname === '/' || pathname.endsWith('.html')) {
+    return { 'Cache-Control': 'no-store, no-cache, must-revalidate' };
+  }
+  if (url.search) {
+    return { 'Cache-Control': 'public, max-age=31536000, immutable' };
+  }
+  return { 'Cache-Control': 'public, max-age=3600' };
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = url.pathname;
@@ -270,7 +280,10 @@ const server = createServer(async (req, res) => {
     try {
       const data = await readFile(filePath);
       const ext = extname(filePath);
-      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+      res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        ...cacheHeaders(pathname, url),
+      });
       res.end(data);
       return;
     } catch {
@@ -283,7 +296,10 @@ const server = createServer(async (req, res) => {
   try {
     const data = await readFile(filePath);
     const ext = extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      ...cacheHeaders(pathname, url),
+    });
     res.end(data);
   } catch {
     res.writeHead(404);
