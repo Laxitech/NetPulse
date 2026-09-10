@@ -601,6 +601,16 @@ body {
   text-transform: uppercase;
 }
 
+.graph-panel .panel-head {
+  position: relative;
+  justify-content: center;
+}
+
+.graph-panel .panel-tip {
+  position: absolute;
+  right: 0;
+}
+
 .mini-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -669,11 +679,15 @@ body {
 .zoom-btn {
   width: 34px;
   height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--panel-glass);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 8px;
   font-size: 17px;
+  line-height: 1;
   font-family: var(--font-mono);
   cursor: pointer;
   backdrop-filter: blur(6px);
