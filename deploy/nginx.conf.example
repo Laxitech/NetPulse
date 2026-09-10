@@ -1,0 +1,37 @@
+# NetPulse reverse-proxy example for nginx.
+#
+# The WebSocket upgrade MUST be forwarded, otherwise the page loads but the
+# traceroute results never arrive ("● Disconnected" in the top bar).
+# Drop this file at /etc/nginx/conf.d/netpulse.conf and:
+#   nginx -t && systemctl reload nginx
+
+server {
+    listen 80;
+    server_name netpulse.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:9901;
+        proxy_http_version 1.1;
+
+        # Required for WebSocket (/ws) to work through the proxy
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+
+# Optional: HTTPS with certbot
+# server {
+#     listen 443 ssl;
+#     server_name netpulse.example.com;
+#     ssl_certificate     /etc/letsencrypt/live/netpulse.example.com/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/netpulse.example.com/privkey.pem;
+#     location / { same as above }
+# }

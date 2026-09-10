@@ -3,6 +3,8 @@ import { TracerouteMap } from './js/traceroute-map.js';
 import { HopDetails } from './js/hop-details.js';
 import { Statistics } from './js/statistics.js';
 import { normalizeHop, applyInfo } from './js/model.js';
+import { isValidDestination } from './js/validate.js';
+import { startSplash } from './js/splash.js';
 
 (() => {
   const destInput = document.getElementById('destination');
@@ -13,6 +15,9 @@ import { normalizeHop, applyInfo } from './js/model.js';
   const themeToggle = document.getElementById('themeToggle');
   const graphEmpty = document.getElementById('graphEmpty');
   const hopTableBody = document.getElementById('hopTableBody');
+  const myIpEl = document.getElementById('myIp');
+  const myIpValueEl = document.getElementById('myIpValue');
+  const traceIpBtn = document.getElementById('traceIpBtn');
 
   const canvas = document.getElementById('networkGraph');
   const infoCard = document.getElementById('infoCard');
@@ -26,11 +31,12 @@ import { normalizeHop, applyInfo } from './js/model.js';
   let ws = null;
   let tracing = false;
   let rawHops = [];
+  let myIp = null;
 
   // ─── Theme ──────────────────────────────────────────────
 
   function getTheme() {
-    return localStorage.getItem('netpulse-theme') || 'light';
+    return localStorage.getItem('netpulse-theme') || 'dark';
   }
 
   function applyTheme(theme, { init = false } = {}) {
@@ -86,7 +92,7 @@ import { normalizeHop, applyInfo } from './js/model.js';
         onTraceEnded('STOPPED');
         break;
       case 'trace_error':
-        onTraceEnded('FAILED');
+        onTraceEnded('FAILED', msg.message || 'Trace failed');
         break;
     }
   }
@@ -150,7 +156,7 @@ import { normalizeHop, applyInfo } from './js/model.js';
     stats.update(rawHops, undefined);
   }
 
-  function onTraceEnded(destStatus) {
+  function onTraceEnded(destStatus, message) {
     tracing = false;
     updateControls();
 
@@ -169,6 +175,7 @@ import { normalizeHop, applyInfo } from './js/model.js';
     const label = status === 'REACHED' ? 'TRACE COMPLETE'
       : status === 'TIMED OUT' ? 'DESTINATION UNREACHABLE — TIMED OUT'
       : status === 'STOPPED' ? 'TRACE STOPPED'
+      : message ? `TRACE FAILED — ${message}`
       : 'TRACE FAILED';
     setTraceStatus(label, status === 'REACHED' ? 'done' : status === 'STOPPED' ? '' : 'error');
 
@@ -217,20 +224,59 @@ import { normalizeHop, applyInfo } from './js/model.js';
   traceBtn.addEventListener('click', startTrace);
   stopBtn.addEventListener('click', () => ws.send(JSON.stringify({ type: 'stop_trace' })));
   destInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') startTrace(); });
+  destInput.addEventListener('input', clearInputError);
 
   function startTrace() {
     const dest = destInput.value.trim();
-    if (!dest || tracing) return;
+    if (!dest) {
+      showInputError('Enter a destination');
+      return;
+    }
+    if (!isValidDestination(dest)) {
+      showInputError('Invalid IP address or hostname');
+      return;
+    }
+    clearInputError();
+    if (tracing) return;
     if (ws && ws.readyState === 1) {
       ws.send(JSON.stringify({ type: 'start_trace', destination: dest }));
     }
+  }
+
+  function showInputError(message) {
+    destInput.classList.add('invalid');
+    setTraceStatus(message, 'error');
+  }
+
+  function clearInputError() {
+    destInput.classList.remove('invalid');
   }
 
   function updateControls() {
     traceBtn.disabled = tracing;
     stopBtn.disabled = !tracing;
     destInput.disabled = tracing;
+    traceIpBtn.disabled = tracing || !myIp;
   }
+
+  function setMyIp(ip) {
+    myIp = ip || null;
+    if (myIp) {
+      myIpValueEl.textContent = myIp;
+      if (myIpEl) myIpEl.title = `Your public IP \u2014 ${myIp}`;
+    } else {
+      myIpValueEl.textContent = '\u2014';
+      myIpEl.title = 'Could not determine public IP';
+    }
+    updateControls();
+  }
+
+  traceIpBtn.addEventListener('click', () => {
+    if (!myIp || tracing) return;
+    destInput.value = myIp;
+    destInput.focus();
+    startTrace();
+  });
 
   function setTraceStatus(text, cls) {
     traceStatusEl.textContent = text;
@@ -314,6 +360,16 @@ import { normalizeHop, applyInfo } from './js/model.js';
   stats.update([], 'IDLE');
   applyTheme(getTheme(), { init: true });
   connectWs();
+  startSplash({ onEnter: () => {
+    destInput.focus({ preventScroll: true });
+    if (map.map) setTimeout(() => { try { map.map.invalidateSize(); } catch {} }, 120);
+  } });
+
+  fetch('/api/myip')
+    .then((r) => r.ok ? r.json() : null)
+    .then((data) => setMyIp(data && data.ip ? data.ip : null))
+    .catch(() => setMyIp(null));
+
   if (map.map) setTimeout(() => { try { map.map.invalidateSize(); } catch {} }, 300);
 
   window.addEventListener('resize', () => {

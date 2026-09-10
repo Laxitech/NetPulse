@@ -13,6 +13,33 @@ const PORT = process.env.PORT || 9901;
 
 const ipInfoCache = new Map();
 
+let myIpCache = null;
+let myIpFetching = null;
+
+function fetchMyIp() {
+  if (myIpCache) return Promise.resolve(myIpCache);
+  if (myIpFetching) return myIpFetching;
+  myIpFetching = new Promise((resolve) => {
+    const req = httpsGet('https://ipinfo.io/ip', { timeout: 4000 }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => {
+        const ip = body.trim();
+        if (ip && /^[0-9a-fA-F:.]+$/.test(ip)) {
+          myIpCache = ip;
+          setTimeout(() => { myIpCache = null; }, 6 * 60 * 60 * 1000);
+          resolve(ip);
+        } else {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+  return myIpFetching;
+}
+
 function fetchIpInfo(ip) {
   return new Promise((resolve) => {
     if (ipInfoCache.has(ip)) return resolve(ipInfoCache.get(ip));
@@ -58,26 +85,110 @@ const LEAFLET_ASSETS = new Set([
 
 const clients = new Map(); // ws -> { proc, destination, tracing }
 
+// ─── Rate limiting / anti-DoS ─────────────────────────────
+
+const RATE_LIMITS = {
+  api: { window: 60_000, max: 60 },
+  ws: { window: 60_000, max: 12 },
+  static: { window: 60_000, max: 600 },
+};
+const MAX_CONCURRENT_TRACES = 3;
+const MAX_CLIENTS = 40;
+const MAX_BODY_BYTES = 16 * 1024;
+const MAX_INFLIGHT = 60;
+
+let activeTraces = 0;
+let inflight = 0;
+const rateBuckets = new Map(); // ip -> { api: [], ws: [], static: [], wsCount: number }
+
+function getClientIp(req) {
+  const cf = req.headers['cf-connecting-ip'];
+  if (typeof cf === 'string' && cf) return cf;
+  const fwd = req.headers['x-forwarded-for'];
+  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim();
+  return String(req.socket.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+}
+
+// Bucket key — rate-limit by IP, but let the smoke test assert 429s against
+// an isolated bucket so it never throttles real user traffic on the same host.
+function getRateKey(req) {
+  const ip = getClientIp(req);
+  if (req.headers['x-ratelimit-test'] === '1') return `test:${ip}`;
+  return ip;
+}
+
+function permit(ip, bucket) {
+  const lim = RATE_LIMITS[bucket];
+  const now = Date.now();
+  let rec = rateBuckets.get(ip);
+  if (!rec) {
+    rec = { api: [], ws: [], static: [] };
+    rateBuckets.set(ip, rec);
+  }
+  let arr = rec[bucket];
+  arr = arr.filter((t) => now - t < lim.window);
+  rec[bucket] = arr;
+  if (arr.length >= lim.max) return false;
+  arr.push(now);
+  return true;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, rec] of rateBuckets) {
+    for (const b of Object.keys(RATE_LIMITS)) {
+      rec[b] = rec[b].filter((t) => now - t < RATE_LIMITS[b].window);
+    }
+    if (!rec.api.length && !rec.ws.length && !rec.static.length) rateBuckets.delete(ip);
+  }
+}, 60_000).unref();
+
 function sendJson(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
 
 function readBody(req) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     let body = '';
-    req.on('data', (chunk) => { body += chunk; });
+    let tooBig = false;
+    req.on('data', (chunk) => {
+      if (body.length + chunk.length > MAX_BODY_BYTES) {
+        tooBig = true;
+        req.destroy();
+        return;
+      }
+      body += chunk.toString();
+    });
     req.on('end', () => {
+      if (tooBig) { resolve(null); return; }
       try { resolve(JSON.parse(body)); }
       catch { resolve({}); }
     });
-    req.on('error', reject);
+    req.on('error', () => resolve(null));
   });
 }
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = url.pathname;
+  const rateKey = getRateKey(req);
+
+  if (++inflight > MAX_INFLIGHT) {
+    res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '1' });
+    res.end(JSON.stringify({ error: 'Server busy, try again shortly' }));
+    inflight--;
+    return;
+  }
+  const release = () => { inflight = Math.max(0, inflight - 1); };
+  res.once('finish', release);
+  res.once('close', release);
+
+  if (pathname.startsWith('/api/')) {
+    if (!permit(rateKey, 'api')) return sendJson(res, 429, { error: 'Too many requests. Slow down.' });
+  } else if (!permit(rateKey, 'static')) {
+    return sendJson(res, 429, { error: 'Too many requests. Slow down.' });
+  }
 
   // Health check
   if (pathname === '/api/health' && req.method === 'GET') {
@@ -88,9 +199,18 @@ const server = createServer(async (req, res) => {
     });
   }
 
+  // Public IP of this server / client
+  if (pathname === '/api/myip' && req.method === 'GET') {
+    const ip = await fetchMyIp();
+    return sendJson(res, 200, { ip });
+  }
+
   // Start trace
   if (pathname === '/api/trace' && req.method === 'POST') {
     const body = await readBody(req);
+    if (!body) {
+      return sendJson(res, 413, { error: 'Request body too large or malformed' });
+    }
     const dest = (body.destination || '').trim();
 
     if (!validateDestination(dest)) {
@@ -171,14 +291,35 @@ const server = createServer(async (req, res) => {
   }
 });
 
-const wss = new WebSocketServer({ server, path: '/ws' });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });
 
-wss.on('connection', (ws) => {
-  clients.set(ws, { proc: null, destination: null, tracing: false });
+wss.on('connection', (ws, request) => {
+  const rateKey = getRateKey(request);
+
+  if (!permit(rateKey, 'ws')) {
+    ws.close(1008, 'Rate limit exceeded. Slow down.');
+    return;
+  }
+  if (wss.clients.size > MAX_CLIENTS) {
+    ws.close(1013, 'Server busy. Try again shortly.');
+    return;
+  }
+
+  clients.set(ws, { proc: null, destination: null, tracing: false, active: false });
 
   ws.send(JSON.stringify({ type: 'connected' }));
 
+  let msgTimes = [];
+
   ws.on('message', async (raw) => {
+    const now = Date.now();
+    msgTimes = msgTimes.filter((t) => now - t < 10_000);
+    if (msgTimes.length >= 30) {
+      ws.close(1008, 'Message flood detected.');
+      return;
+    }
+    msgTimes.push(now);
+
     let msg;
     try { msg = JSON.parse(raw.toString()); }
     catch { return; }
@@ -196,6 +337,11 @@ wss.on('connection', (ws) => {
         return;
       }
 
+      if (activeTraces >= MAX_CONCURRENT_TRACES) {
+        ws.send(JSON.stringify({ type: 'trace_error', message: 'Too many concurrent traces. Try again in a moment.' }));
+        return;
+      }
+
       const cmd = await ensureCommand();
       if (!cmd) {
         ws.send(JSON.stringify({ type: 'trace_error', message: 'Traceroute command not found. Install traceroute or tracepath.' }));
@@ -203,9 +349,20 @@ wss.on('connection', (ws) => {
       }
 
       state.tracing = true;
+      state.active = true;
       state.destination = dest;
+      activeTraces++;
 
       ws.send(JSON.stringify({ type: 'trace_started', destination: dest }));
+
+      const done = () => {
+        state.tracing = false;
+        state.proc = null;
+        if (state.active) {
+          state.active = false;
+          activeTraces = Math.max(0, activeTraces - 1);
+        }
+      };
 
       const proc = runTraceroute(
         dest,
@@ -221,17 +378,19 @@ wss.on('connection', (ws) => {
           }
         },
         (code) => {
-          state.tracing = false;
-          state.proc = null;
+          done();
           ws.send(JSON.stringify({ type: 'trace_completed', destination: dest }));
         },
         (err) => {
-          state.tracing = false;
-          state.proc = null;
+          done();
           ws.send(JSON.stringify({ type: 'trace_error', message: err.message }));
         }
       );
 
+      if (!proc) {
+        done();
+        return;
+      }
       state.proc = proc;
     }
 
@@ -252,6 +411,10 @@ wss.on('connection', (ws) => {
     const state = clients.get(ws);
     if (state && state.proc && !state.proc.killed) {
       state.proc.kill('SIGTERM');
+    }
+    if (state && state.active) {
+      state.active = false;
+      activeTraces = Math.max(0, activeTraces - 1);
     }
     clients.delete(ws);
   });

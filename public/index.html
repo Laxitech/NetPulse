@@ -1,20 +1,58 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NetPulse — Network Path Visualizer</title>
+  <script>
+    try {
+      document.documentElement.setAttribute('data-theme', localStorage.getItem('netpulse-theme') || 'dark');
+    } catch (e) {}
+  </script>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/vendor/leaflet.css">
   <link rel="stylesheet" href="/style.css">
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "yg0q3459pr");
+  </script>
 </head>
 <body>
+  <div id="splash" class="splash">
+    <canvas id="splashCanvas" class="splash-canvas"></canvas>
+    <div class="splash-shell">
+      <div class="splash-brand">
+        <h1 class="splash-logo">NET<span>PULSE</span></h1>
+        <p class="splash-tagline">watch your packets traverse the internet &mdash; hop by hop</p>
+        <div class="splash-byline">POWERED BY <b>GALAXYDEV.PK</b></div>
+      </div>
+      <button id="splashEnter" class="splash-enter" type="button">
+        <span class="splash-enter-label">ENTER NETPULSE</span>
+        <span class="splash-enter-ring"></span>
+      </button>
+      <div class="splash-feats">
+        <span>LIVE TOPOLOGY GRAPH</span><i>&middot;</i>
+        <span>GEOGRAPHIC ROUTE MAP</span><i>&middot;</i>
+        <span>GEOIP INTEL</span>
+      </div>
+    </div>
+    <div class="splash-glow"></div>
+  </div>
+
   <header class="topbar">
     <div class="topbar-left">
       <span class="logo">NETPULSE</span>
       <span class="logo-sub">NETWORK PATH VISUALIZER</span>
+      <span id="myIp" class="ip-badge" title="Your public IP">
+        <span class="ip-badge-label">MY IP</span>
+        <b id="myIpValue" class="ip-badge-value">&#8230;</b>
+      </span>
     </div>
     <div class="topbar-right">
+      <button id="traceIpBtn" class="btn btn-quick" title="Run a traceroute to your public IP" disabled>TRACE IP</button>
       <button id="themeToggle" class="theme-toggle" title="Toggle theme">
         <span class="theme-icon-light">&#9728;</span>
         <span class="theme-icon-dark">&#9788;</span>
@@ -95,6 +133,12 @@
       </section>
     </div>
   </main>
+
+  <footer class="app-footer">
+    <span>NETPULSE</span><i>&middot;</i>
+    <b>GALAXYDEV.PK</b><i>&middot;</i>
+    <a class="footer-mail" href="mailto:info@galaxydev.pk">info@galaxydev.pk</a>
+  </footer>
 
   <script src="/vendor/leaflet.js"></script>
   <script type="module" src="/app.js"></script>

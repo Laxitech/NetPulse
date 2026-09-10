@@ -17,14 +17,66 @@ await page.setViewport({ width: 1400, height: 1000 });
 
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+page.on('console', (m) => {
+  if (m.type() !== 'error') return;
+  if (/429|failed to load resource/i.test(m.text())) return;
+  errors.push(`console: ${m.text()}`);
+});
 
 await page.goto(URL, { waitUntil: 'networkidle2', timeout: 15000 });
-await sleep(500);
+await sleep(800);
+
+// 0. Splash screen (canvas animation + branding), then enter
+const splash = await page.evaluate(() => {
+  const s = document.getElementById('splash');
+  const c = document.getElementById('splashCanvas');
+  const a = c.getContext('2d');
+  const sample = () => {
+    const data = a.getImageData(0, 0, c.width, c.height).data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) sum += data[i];
+    return sum;
+  };
+  const before = sample();
+  return new Promise((res) => setTimeout(() => {
+    res({
+      visible: getComputedStyle(s).display !== 'none',
+      canvasSize: [c.width, c.height],
+      animating: before !== sample(),
+      title: document.querySelector('.splash-logo').textContent.trim(),
+      byline: document.querySelector('.splash-byline').textContent.trim(),
+      hasEnter: !!document.getElementById('splashEnter'),
+    });
+  }, 700));
+});
+console.log('splash:', splash);
+const splashOk =
+  splash.visible === true &&
+  splash.canvasSize[0] > 0 && splash.canvasSize[1] > 0 &&
+  splash.animating === true &&
+  /NETPULSE/.test(splash.title) && /GALAXYDEV.PK/i.test(splash.byline) &&
+  splash.hasEnter === true;
+
+await page.click('#splashEnter');
+await sleep(1100);
+const splashGone = await page.evaluate(() => getComputedStyle(document.getElementById('splash')).display === 'none');
+console.log('splash dismissed:', splashGone);
 
 // 1. Initial render
 const statsInit = await page.evaluate(() => !!document.querySelector('#stat-hops'));
 console.log('stats initialized:', statsInit);
+
+// 1. Invalid input should be rejected before it is ever sent
+await page.type('#destination', 'bad host!!!; rm -rf /');
+await page.click('#traceBtn');
+await sleep(300);
+const invalidUi = await page.evaluate(() => ({
+  invalidClass: document.querySelector('#destination').classList.contains('invalid'),
+  status: document.querySelector('#traceStatus').textContent,
+}));
+console.log('invalid input UI:', invalidUi);
+const invalidOk = invalidUi.invalidClass === true && /invalid/i.test(invalidUi.status);
+await page.evaluate(() => { document.querySelector('#destination').value = ''; });
 
 // 2. Start a trace
 await page.type('#destination', DEST);
@@ -107,7 +159,34 @@ console.log('details panel:', detailText);
 
 console.log('JAVASCRIPT ERRORS:', errors.length ? errors : 'none');
 
-// 10. Dark theme toggle
+// 9b. My-IP badge + quick TRACE IP action
+await page.waitForFunction(() => /MY IP/.test(document.body.textContent), { timeout: 8000 }).catch(() => {});
+const myIpState = await page.evaluate(() => ({
+  badge: document.getElementById('myIpValue').textContent,
+  quickDisabled: document.getElementById('traceIpBtn').disabled,
+  footer: document.querySelector('.app-footer').textContent.trim(),
+}));
+console.log('my ip / quick action:', myIpState);
+const myIpOk =
+  /^\d{1,3}(\.\d{1,3}){3}$/.test(myIpState.badge) &&
+  myIpState.quickDisabled === false &&
+  /GALAXYDEV.PK/i.test(myIpState.footer) &&
+  /info@galaxydev\.pk/i.test(myIpState.footer);
+
+// 9c. Rate limiting: a burst of API calls must start returning 429
+const burst = await page.evaluate(async () => {
+  const out = [];
+  for (let i = 0; i < 70; i++) {
+    const r = await fetch('/api/health', { headers: { 'x-ratelimit-test': '1' } }).catch(() => null);
+    if (r) out.push(r.status);
+  }
+  const ok = out.filter((s) => s === 429).length > 0;
+  return { burstLen: out.length, got429: ok, statuses: [...new Set(out)].sort() };
+});
+console.log('rate limit burst:', burst);
+const rateOk = burst.burstLen === 70 && burst.got429 === true;
+
+// 10. Dark theme is the default; toggle to light
 const theme = await page.evaluate(() => {
   const before = document.documentElement.getAttribute('data-theme');
   document.querySelector('#themeToggle').click();
@@ -118,17 +197,19 @@ const theme = await page.evaluate(() => {
   };
 });
 console.log('theme toggle:', theme);
-const themeOk = theme.before === 'light' && theme.after === 'dark' && theme.stored === 'dark';
+const themeOk = theme.before === 'dark' && theme.after === 'light' && theme.stored === 'light';
 
 const destReached = /REACHED/.test(statDest);
 console.log('expectation: reachable =', destReached, '| dest star present =', mapPanes.destMarker);
 
 const ok =
-  statsInit && hopCount > 0 && canvasState.w > 0 && statHops === String(hopCount) &&
+  splashOk && splashGone &&
+  statsInit && invalidOk &&
+  hopCount > 0 && canvasState.w > 0 && statHops === String(hopCount) &&
   /COMPLETE|UNREACHABLE/.test(traceStatus) && mapPanes.hasLeaflet && mapLive.traveler &&
   mapLive.loadedTiles > 0 && mapLive.travelerOpacity !== '0' &&
   mapPanes.destMarker === destReached && // star only when destination reached
-  themeOk && errors.length === 0;
+  myIpOk && rateOk && themeOk && errors.length === 0;
 
 await browser.close();
 console.log(ok ? 'SMOKE TEST: PASS' : 'SMOKE TEST: FAIL');

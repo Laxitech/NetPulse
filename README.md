@@ -10,6 +10,9 @@ NetPulse is a lightweight, dependency-minimal tool that runs `traceroute` from y
 
 ## Features
 
+- **Animated network splash screen** — a canvas-fuelled wireframe globe with live packet arcs, radar, and `GALAXYDEV.PK` branding before you enter the tool
+- **Your public IP in the navbar** with a one-click **TRACE IP** quick action
+- **Themes in `GALAXYDEV.PK` footer branding**
 - **Real-time traceroute** streamed hop-by-hop over WebSocket
 - **Interactive Canvas graph** — zoom, pan, drag, and fit-to-view controls
 - **Geographic map** (free OpenStreetMap tiles, no API key) with hop markers and route polyline
@@ -19,9 +22,11 @@ NetPulse is a lightweight, dependency-minimal tool that runs `traceroute` from y
 - **Statistics bar** — hop count, average/max latency, destination, trace duration
 - **Live hop table** — latency, packet loss, status per hop
 - **Progressive rendering** with probe and destination-pulse animations
-- **Light/dark themes** (persisted), full-width background artwork
+- **Light/dark themes** (dark by default, persisted), full-width background artwork
+- **Microsoft Clarity analytics** — session recordings and heatmaps
+- **Hardened against traffic floods** — per-IP rate limiting on the HTTP API, static assets, and WebSocket connections, a global cap on concurrent trace processes, message-size limits, and an in-flight request ceiling, so the server returns `429`/`503` instead of crashing under load
 - **Stop / cancel** running traces anytime
-- **Community-grade security** — input validation, no shell interpolation
+- **Community-grade security** — shared client/server input validation (IPv4, IPv6, hostname), no shell interpolation
 
 ---
 
@@ -56,9 +61,17 @@ Browser ←─ WebSocket ─→ Node.js server ←─ spawn() ─→ traceroute 
 | Endpoint | Description |
 | --- | --- |
 | `GET /api/health` | Server + traceroute-command status |
+| `GET /api/myip` | Your public IP (cached, ipinfo.io) |
 | `GET /api/trace/status` | Whether a trace is in progress |
 | `GET /api/ipinfo/:ip` | Cached ipinfo.io lookup for an IP |
 | `GET /vendor/*` | Leaflet assets served locally (allowlist enforced) |
+
+### Abuse protection
+
+- Each client IP is rate-limited independently against dedicated budgets: **60** API calls/min, **600** static requests/min, **12** WebSocket connections/min (fixed 60-second windows, `429` when exceeded).
+- **Up to 3 concurrent `traceroute` processes** globally; extra start requests get a friendly error instead of spawning indefinite children.
+- HTTP requests cap at **60 in-flight** (`503 Busy` beyond that); request bodies are limited to **16 KB**; WebSocket messages to **64 KB**; chatty sockets (30 msgs/10 s) are disconnected.
+- Works safely behind Cloudflare/nginx (honors `CF-Connecting-IP` / `X-Forwarded-For`).
 
 ---
 
@@ -81,7 +94,9 @@ netpulse/
 │   │   ├── network-graph.js  # Canvas graph component
 │   │   ├── traceroute-map.js # Leaflet map + traveler component
 │   │   ├── hop-details.js    # details panel component
-│   │   └── statistics.js     # stats bar component
+│   │   ├── statistics.js     # stats bar component
+│   │   ├── validate.js       # shared client/server IP + hostname validation
+│   │   └── splash.js         # network-globe splash animation (canvas)
 │   └── Images/
 │       └── bg-route-canvas.jpg  # background artwork
 ├── scripts/
@@ -125,6 +140,19 @@ Then open **http://localhost:9901**, type a destination such as `8.8.8.8`, and p
 | `npm start` | Run the server on port 9901 |
 | `npm run dev` | Run with auto-restart on file changes |
 | `PORT=8080 npm start` | Run on a custom port |
+
+### Behind a reverse proxy (nginx)
+
+If you serve NetPulse through nginx, use `deploy/nginx.conf.example`. The critical part is forwarding the WebSocket upgrade — without it the page loads but traceroute results never appear (the top bar shows `● Disconnected`):
+
+```nginx
+proxy_pass http://127.0.0.1:9901;
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+```
+
+Verify the proxy forwards WebSockets from your browser console: the status badge in the top bar should read `● Connected`.
 
 ---
 

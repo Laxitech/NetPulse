@@ -61,6 +61,8 @@ html, body {
 }
 
 body {
+  display: flex;
+  flex-direction: column;
   background-color: var(--background);
   background-image:
     linear-gradient(var(--bg-overlay), var(--bg-overlay)),
@@ -149,9 +151,11 @@ body {
 /* ─── Layout ────────────────────────────────────────────── */
 
 .container {
+  flex: 1 0 auto;
   max-width: 1440px;
   margin: 0 auto;
   padding: 20px 24px 40px;
+  width: 100%;
 }
 
 /* ─── Controls ──────────────────────────────────────────── */
@@ -176,6 +180,311 @@ body {
 .input-row input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.input-row input.invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* ---------------------------------------------------------------- */
+/* Splash screen                                                     */
+/* ---------------------------------------------------------------- */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, rgba(20, 48, 72, 0.9), transparent 60%),
+    radial-gradient(900px 600px at 85% 110%, rgba(8, 38, 48, 0.85), transparent 60%),
+    linear-gradient(180deg, #02060c 0%, #04121c 45%, #020a12 100%);
+  color: #e6f7ff;
+  overflow: hidden;
+}
+
+.splash-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.splash-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 45% at 50% 45%, rgba(6, 182, 212, 0.10), transparent 70%);
+  animation: splashBreath 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes splashBreath {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1.1; }
+}
+
+.splash-shell {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 34px;
+  padding: 24px;
+  max-width: 640px;
+  pointer-events: none;
+}
+
+.splash-enter { pointer-events: auto; }
+
+.splash-brand { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+
+.splash-logo {
+  font-family: var(--font-mono);
+  font-size: clamp(44px, 9vw, 84px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  background: linear-gradient(115deg, #67e8f9 0%, #22d3ee 35%, #2dd4bf 70%, #a7f3d0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 22px rgba(45, 212, 191, 0.45)) drop-shadow(0 10px 30px rgba(2, 132, 199, 0.35));
+  animation: splashTitlePulse 4.5s ease-in-out infinite;
+}
+
+.splash-logo span { color: #f0fdfa; -webkit-text-fill-color: #f0fdfa; }
+
+@keyframes splashTitlePulse {
+  0%, 100% { filter: drop-shadow(0 0 18px rgba(45, 212, 191, 0.4)) drop-shadow(0 10px 30px rgba(2, 132, 199, 0.3)); }
+  50% { filter: drop-shadow(0 0 34px rgba(45, 212, 191, 0.7)) drop-shadow(0 10px 34px rgba(2, 132, 199, 0.5)); }
+}
+
+.splash-tagline {
+  font-family: var(--font-sans);
+  font-size: clamp(13px, 2vw, 17px);
+  color: rgba(203, 228, 244, 0.85);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  max-width: 560px;
+}
+
+.splash-byline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(8, 47, 73, 0.45);
+  padding: 7px 16px;
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.18), inset 0 0 14px rgba(56, 189, 248, 0.08);
+}
+
+.splash-byline b {
+  color: #e0f2fe;
+  letter-spacing: 0.22em;
+  font-weight: 800;
+}
+
+.splash-enter {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  color: #052e35;
+  background: linear-gradient(115deg, #5eead4, #22d3ee);
+  border: none;
+  border-radius: 999px;
+  padding: 15px 40px;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 0 26px rgba(45, 212, 191, 0.5);
+  animation: enterPulse 2.4s ease-in-out infinite;
+}
+
+.splash-enter:hover {
+  transform: scale(1.06);
+  filter: brightness(1.08);
+  box-shadow: 0 0 40px rgba(45, 212, 191, 0.85);
+}
+
+.splash-enter:active { transform: scale(0.97); }
+
+@keyframes enterPulse {
+  0%, 100% { box-shadow: 0 0 22px rgba(45, 212, 191, 0.45); }
+  50% { box-shadow: 0 0 46px rgba(45, 212, 191, 0.85); }
+}
+
+.splash-enter-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  border: 1px solid rgba(94, 234, 212, 0.5);
+  animation: ringExpand 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ringExpand {
+  0% { transform: scale(1); opacity: 0.9; }
+  70% { transform: scale(1.12); opacity: 0; }
+  100% { transform: scale(1.12); opacity: 0; }
+}
+
+.splash-feats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.24em;
+  color: rgba(148, 197, 224, 0.72);
+}
+
+.splash-feats i {
+  font-style: normal;
+  color: rgba(45, 212, 191, 0.7);
+}
+
+.splash.splash-leaving {
+  animation: splashFade 0.7s ease forwards;
+}
+
+@keyframes splashFade {
+  to { opacity: 0; }
+}
+
+/* My IP badge + quick action -------------------------------- */
+
+.ip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 4px 12px 4px 5px;
+  margin-left: 10px;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.ip-badge-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+
+.ip-badge-value {
+  color: var(--text);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-quick {
+  font-size: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-quick:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--background);
+  box-shadow: 0 0 14px var(--accent-dim);
+}
+
+.btn-quick:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.app-footer {
+  max-width: 1440px;
+  margin: 10px auto 26px;
+  padding: 16px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  background: var(--panel-glass);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+
+.app-footer span {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.app-footer b {
+  color: var(--accent);
+  letter-spacing: 0.18em;
+  font-weight: 800;
+}
+
+.app-footer .footer-mail {
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  border: 1px solid var(--accent);
+  background: var(--accent-dim);
+  padding: 6px 14px;
+  border-radius: 999px;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-footer .footer-mail:hover {
+  background: var(--accent);
+  color: var(--background);
+  box-shadow: 0 0 16px var(--accent-dim);
+  text-decoration: none;
+}
+
+.app-footer i { font-style: normal; color: var(--accent); opacity: 0.9; }
+
+@media (max-width: 640px) {
+  .ip-badge { display: none; }
 }
 
 .input-row input::placeholder { color: var(--muted); }

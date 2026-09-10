@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { detectCommand } from './parser.js';
+import { isValidDestination } from '../public/js/validate.js';
 
 let command = null;
 
@@ -10,13 +11,7 @@ async function ensureCommand() {
 }
 
 function validateDestination(dest) {
-  if (!dest || typeof dest !== 'string') return false;
-  const trimmed = dest.trim();
-  if (!trimmed) return false;
-  if (trimmed.startsWith('-')) return false;
-  // Allow IPv4, IPv6, hostnames
-  if (/^[a-zA-Z0-9._:/-]+$/.test(trimmed)) return true;
-  return false;
+  return isValidDestination(dest);
 }
 
 function runTraceroute(destination, onHop, onComplete, onError) {
