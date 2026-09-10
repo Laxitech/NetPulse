@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetPulse — Network Path Visualizer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/vendor/leaflet.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="logo">NETPULSE</span>
+      <span class="logo-sub">NETWORK PATH VISUALIZER</span>
+    </div>
+    <div class="topbar-right">
+      <button id="themeToggle" class="theme-toggle" title="Toggle theme">
+        <span class="theme-icon-light">&#9728;</span>
+        <span class="theme-icon-dark">&#9788;</span>
+      </button>
+      <span id="wsStatus" class="status-badge status-disconnected">&#9679; Disconnected</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="controls">
+      <div class="input-row">
+        <input
+          type="text"
+          id="destination"
+          placeholder="Target (8.8.8.8, google.com, IPv6)"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button id="traceBtn" class="btn btn-trace">TRACE</button>
+        <button id="stopBtn" class="btn btn-stop" disabled>STOP</button>
+      </div>
+      <div id="traceStatus" class="trace-status"></div>
+    </section>
+
+    <section class="stats-bar" id="statsBar"></section>
+
+    <div class="viz-grid">
+      <section class="viz-panel graph-panel">
+        <div class="panel-head">
+          <h2 class="section-title">NETWORK TOPOLOGY</h2>
+          <span class="panel-tip">drag to pan &middot; scroll to zoom &middot; double-click</span>
+        </div>
+        <div class="graph-wrap" id="graphWrap">
+          <canvas id="networkGraph"></canvas>
+          <div class="zoom-controls">
+            <button id="zoomIn" class="zoom-btn" title="Zoom in">+</button>
+            <button id="zoomOut" class="zoom-btn" title="Zoom out">&#8722;</button>
+            <button id="zoomFit" class="zoom-btn" title="Fit to view">&#8862;</button>
+          </div>
+          <div id="graphEmpty" class="graph-empty">ENTER A DESTINATION AND PRESS TRACE</div>
+        </div>
+      </section>
+
+      <section class="viz-panel map-panel">
+        <div class="panel-head">
+          <h2 class="section-title">GEOGRAPHIC ROUTE</h2>
+          <button id="mapFit" class="mini-btn" title="Fit map to route">FIT</button>
+        </div>
+        <div id="tracerouteMap" class="map-container"></div>
+      </section>
+    </div>
+
+    <div class="bottom-grid">
+      <section class="viz-panel detail-panel">
+        <h2 class="section-title">SELECTED HOP</h2>
+        <div id="infoCard" class="info-card">
+          <div class="info-empty">Select a hop or map marker to inspect</div>
+        </div>
+      </section>
+
+      <section class="viz-panel table-panel">
+        <h2 class="section-title">HOP DETAILS</h2>
+        <div class="table-wrap">
+          <table id="hopTable">
+            <thead>
+              <tr>
+                <th>Hop</th>
+                <th>IP Address</th>
+                <th>Hostname</th>
+                <th>Latency</th>
+                <th>Loss</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="hopTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/vendor/leaflet.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
